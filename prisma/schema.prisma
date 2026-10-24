@@ -1,0 +1,98 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  LEAD
+  STAFF
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  name             String?
+  password         String?
+  role             Role              @default(STAFF)
+  status           UserStatus        @default(PENDING)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  invitationTokens InvitationToken[]
+  refreshTokens    RefreshToken[]
+  expenses         Expense[]         @relation("UserExpenses")
+  reviewedExpenses Expense[]         @relation("ReviewedExpenses")
+
+  @@map("users")
+}
+
+model InvitationToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("invitation_tokens")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Expense {
+  id              String        @id @default(uuid())
+  title           String
+  amount          Decimal       @db.Decimal(15, 2)
+  date            DateTime
+  description     String?
+  receiptUrl      String
+  receiptPublicId String?
+  status          ExpenseStatus @default(PENDING)
+  rejectionReason String?
+  
+  userId          String
+  user            User          @relation("UserExpenses", fields: [userId], references: [id], onDelete: Cascade)
+  
+  reviewedById    String?
+  reviewedBy      User?         @relation("ReviewedExpenses", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([date])
+  @@map("expenses")
+}
